@@ -10,6 +10,8 @@ from intermod_v3 import IntermodCalculator, FrequencyList, Coordination
     - spacing between channels should be at a minimum {{spacing}} apart with a default of 0.125
 3 - Tests a given freq against a list of existing freqs and IMD products to make sure it does not conflict.
 4 - Get a list of frequencies that conform to step 2, but also is NOT within {{spacing}} of any possible IMD product
+
+Fundamentally, the system is not calculating freq to freq IMD correctly.  All other softwares are rejecting most of my freqs
 """
 
 class TestIMDCalculator(unittest.TestCase):

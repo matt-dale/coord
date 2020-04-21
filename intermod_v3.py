@@ -17,7 +17,7 @@ class Coordination(object):
         self.avoid_imd_fifths_by = 0.089
         self.default_bandwidth = 0.299
 
-    def run_a_test(self):
+    def run_a_test(self, start_freq=None):
         """
         run a test coordination:
         1 - get a list of freqs that we'd like to test from the imd_calc
@@ -27,8 +27,10 @@ class Coordination(object):
 
         490, 490.375, 491.375, 491.75, 493.75, 494.75, 495.5, 496.5, 498.75
         """
-        test_frequencies = self.imd_calc.get_freqs()
+        test_frequencies = self.imd_calc.get_freqs(start_freq=start_freq)
         uncoordinated_freqs = self.uncoordinated_freqs.get_freq_values() # these are freqs that we've already tested
+        # if the test has already been run, double check for freqs we've already tested and remove them from the list
+        test_frequencies = list(set(test_frequencies+uncoordinated_freqs))
         for freq in test_frequencies:
             # bail out early if there is a direct hit with any of the IMDs
             if freq in self.imd_thirds or freq in self.imd_fifths:
@@ -54,13 +56,23 @@ class Coordination(object):
                     # if it doesn't pass the test, just add the freq to uncoordinated_freqs
                     self.uncoordinated_freqs.append_(freq)
 
+    def run_a_test_for_additional_freqs(self):
+        """
+        after the above test has run, attempt to get more frequencies by picking a different list 
+        to choose from
+
+        mind the gap: 609.125, 610.625 MHz, 613.50 rejected from WWB
+        """
+        self.run_a_test(start_freq=470.050)
+        return
+
     def test_one_freq(self, freq, imd_thirds, imd_fifths):
         """
         returns Boolean if it meets the spec
         """
         results = True
-        #low_end = freq - self.default_bandwidth/2
-        #high_end = freq + self.default_bandwidth/2
+        low_end = freq - self.default_bandwidth/2
+        high_end = freq + self.default_bandwidth/2
         for cofreq in self.coordinated_freqs.get_freq_values(): # test the freq spacing between all other system freqs
             if abs(freq-cofreq) < self.default_bandwidth:
                 results = False
@@ -76,26 +88,26 @@ class Coordination(object):
                 if abs(third-freq) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
-                """
+                
                 if abs(third-low_end) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
                 if abs(third-high_end) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
-                """
+                
             for fifth in imd_fifths:
                 if abs(fifth-freq) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
-                """
+                
                 if abs(fifth-low_end) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
                 if abs(fifth-high_end) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
-                """
+                
 
         return results
 
@@ -265,12 +277,12 @@ class IntermodCalculator(object):
         if self.thirds:
             #a = round((3*f1),3)
             #b = round((3*f2),3)
-            #c = round(((2*f1)+f2),3)
+            c = round(((2*f1)+f2),3)
             d = round(((2*f1)-f2),3)
-            #e = round(((2*f2)+f1),3)
+            e = round(((2*f2)+f1),3)
             f = round(((2*f2)-f1),3)
             
-            for x in [d,f]:
+            for x in [c,d,e,f]:
                 #if x > self. and x < self.end_freq:
                 bad_freqs.append(x)
         return set(bad_freqs)
