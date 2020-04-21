@@ -1,0 +1,22 @@
+imd tests
+RangeSearch
+
+Goal: Create a list of frequencies whose IMD products are at least 0.01 MHz away on any freqs in the list.  Create a list based on the following parameters.
+
+1 - what parameters are we operating in?  
+    - No freq can be less than 0.125 MHz apart
+    - All freqs must be within the supplied start_freq and end_freq windows
+    - accept a list of frequencies to avoid (like a blackout zone)
+    - accept a list of already used frequencies
+    - accept a bandwidth param, but use a default to find freqs
+    - accept a max_number of frequencies to search for, so we know we can stop once we've found this number.  If it is not provided, keep testing until no new freqs are found.
+    - the object should hold a list of IMD3 hits, IMD5 hits and a combined IMD list for comparisons against
+    - the object should hold a candidate_list which is the list of freqs that gets populated with "good frequencies"
+2 - If "already used frequencies" was supplied, don't clear out the IMD list, otherwise clear it because we are making a new calculation
+3 - Build a list of frequencies to test IMD against the current situation.  This list should not include any freqs already inside the IMD list, the candidate_list or the "already used frequencies" list
+    - How do we build this list so that it follows the params in step 1? There should be a smart method that grabs a freq that is probably good
+4 - Test each freq in the list generated in step 3 for IMD with all other frequencies in the situation.  
+
+
+
+
