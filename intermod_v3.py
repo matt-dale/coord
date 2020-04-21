@@ -2,7 +2,7 @@ import itertools
 
 class Coordination(object):
     """
-    used to store the existing state of the coordination
+    stores the existing state of the coordination
     """
     def __init__(self, *args, **kwargs):
         self.coordinated_freqs = FrequencyList([])
@@ -12,8 +12,8 @@ class Coordination(object):
         self.high_stop = 950
         self.imd_thirds = []
         self.imd_fifths = []
-        self.imd_calc = IntermodCalculator(start_freq=490, end_freq=600, coordination=self)
-        self.avoid_imd_thirds_by = 0.099
+        self.imd_calc = IntermodCalculator(start_freq=470, end_freq=615, coordination=self)
+        self.avoid_imd_thirds_by = 0.099 
         self.avoid_imd_fifths_by = 0.089
         self.default_bandwidth = 0.299
 
@@ -29,20 +29,26 @@ class Coordination(object):
         """
         test_frequencies = self.imd_calc.get_freqs()
         for freq in test_frequencies:
+            # bail out early if there is a direct hit with any of the IMDs
             if freq in self.imd_thirds or freq in self.imd_fifths:
                 continue
             elif self.coordinated_freqs.length() == 0:
+                # if there are no freqs to test against, then just assume it's ok 
+                # TODO:  check against known DTV and any supplied freqs
                 self.coordinated_freqs.append_(freq)
             else:
                 # test this freq against all others in the coordinated list
+                # create a copy of the existing coordinated_freqs and add the test freq to it 
                 test_list = FrequencyList(self.coordinated_freqs.get_freq_values())
                 test_list.append_(freq)
                 thirds, fifths = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_list)
                 if self.test_one_freq(freq, thirds, fifths):
+                    # if the freq passes the IMD tests, then add it to coordinated_freqs and add all the IMDs to the respective lists
                     self.coordinated_freqs.append_(freq)
                     self.imd_thirds.append(thirds)
                     self.imd_fifths.append(fifths)
                 else:
+                    # if it doesn't pass the test, just add the freq to uncoordinated_freqs
                     self.uncoordinated_freqs.append_(freq)
 
     def test_one_freq(self, freq, imd_thirds, imd_fifths):
@@ -186,6 +192,8 @@ class IntermodCalculator(object):
 
     def get_freqs(self, start_freq=None):
         """
+        This function *SHOULD* return a "pre-coordinated" list of freqs, 
+        NOT evenly spaced.  But how?
         returns evenly spaced frequencies in a list format
         # TODO: after a search fails, provide with a start_freq, offsetted by X amount
         to find more freqs
