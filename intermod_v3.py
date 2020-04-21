@@ -23,14 +23,17 @@ class Coordination(object):
         1 - get a list of freqs that we'd like to test from the imd_calc
         2 - add two freqs from the list to the test list and calculate IMD
         3 - evaluate whether to keep the freq or try another one 
-        IAS says that only 8 of these freqs are coordinated: 494.750 is not
+        IAS says that only 8 of these freqs are coordinated: 494.750 is not because of IMD 5ths?
 
         490, 490.375, 491.375, 491.75, 493.75, 494.75, 495.5, 496.5, 498.75
         """
         test_frequencies = self.imd_calc.get_freqs()
+        uncoordinated_freqs = self.uncoordinated_freqs.get_freq_values() # these are freqs that we've already tested
         for freq in test_frequencies:
             # bail out early if there is a direct hit with any of the IMDs
             if freq in self.imd_thirds or freq in self.imd_fifths:
+                continue
+            elif freq in uncoordinated_freqs: #we've already tested this one
                 continue
             elif self.coordinated_freqs.length() == 0:
                 # if there are no freqs to test against, then just assume it's ok 
@@ -56,41 +59,44 @@ class Coordination(object):
         returns Boolean if it meets the spec
         """
         results = True
-        low_end = freq - self.default_bandwidth/2
-        high_end = freq + self.default_bandwidth/2
-        freqs = [low_end, freq, high_end]
+        #low_end = freq - self.default_bandwidth/2
+        #high_end = freq + self.default_bandwidth/2
+        for cofreq in self.coordinated_freqs.get_freq_values(): # test the freq spacing between all other system freqs
+            if abs(freq-cofreq) < self.default_bandwidth:
+                results = False
+                return results
 
         if freq in imd_thirds:
             results = False
         elif freq in imd_fifths:
             results = False
         else:
-            #check for spacings
+            #check for spacings from IMD products
             for third in imd_thirds:
                 if abs(third-freq) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
+                """
                 if abs(third-low_end) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
                 if abs(third-high_end) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
-                
+                """
             for fifth in imd_fifths:
                 if abs(fifth-freq) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
+                """
                 if abs(fifth-low_end) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
                 if abs(fifth-high_end) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
-            for cofreq in self.coordinated_freqs.get_freq_values():
-                if abs(freq-cofreq) < self.default_bandwidth:
-                    results = False
-                    return results
+                """
+
         return results
 
 
@@ -220,17 +226,6 @@ class IntermodCalculator(object):
             imd_thirds.extend(thirds)
             imd_fifths.extend(fifths)
 
-        # now calculate IMD between the IMD products # HOW MANY TIMES DO I DO THIS?
-        '''
-        imds = imd_thirds + imd_fifths
-        imd_freq_list = FrequencyList(imds)
-        imd_freqs_to_test = imd_freq_list.create_freq_pair_list_from_itself()
-        for freq_pair in imd_freqs_to_test:
-            thirds, fifths = self.calculate_imds(freq_pair[0].freq, freq_pair[1].freq)
-            imd_thirds.extend(thirds)
-            imd_fifths.extend(fifths)
-        '''
-
         return imd_thirds, imd_fifths
     
 
@@ -268,14 +263,14 @@ class IntermodCalculator(object):
         """
         bad_freqs = []
         if self.thirds:
-            a = round((3*f1),3)
-            b = round((3*f2),3)
-            c = round(((2*f1)+f2),3)
+            #a = round((3*f1),3)
+            #b = round((3*f2),3)
+            #c = round(((2*f1)+f2),3)
             d = round(((2*f1)-f2),3)
-            e = round(((2*f2)+f1),3)
+            #e = round(((2*f2)+f1),3)
             f = round(((2*f2)-f1),3)
             
-            for x in [a,b,c,d,e,f]:
+            for x in [d,f]:
                 #if x > self. and x < self.end_freq:
                 bad_freqs.append(x)
         return set(bad_freqs)
@@ -286,11 +281,11 @@ class IntermodCalculator(object):
         """
         bad_freqs = []
         if self.fifths:
-            a = round(((3*f1)+(2*f2)),3)
+            #a = round(((3*f1)+(2*f2)),3)
             b = round(((3*f1)-(2*f2)),3)
-            c = round(((3*f2)+(2*f1)),3)
+            #c = round(((3*f2)+(2*f1)),3)
             d = round(((3*f2)-(2*f1)),3)
-            for x in [a,b,c,d]:
+            for x in [b,d]:
                 #if x > self.start_freq and x < self.end_freq:
                 bad_freqs.append(x)
         return set(bad_freqs)

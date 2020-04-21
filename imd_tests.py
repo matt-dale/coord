@@ -99,6 +99,39 @@ class TestIMDCalculator(unittest.TestCase):
         for f in f_list.get_freq_values():
             self.assertIn(f, test_list)
 
+    def test_coord_default_instance(self):
+        coord = Coordination()
+        self.assertEqual(coord.default_bandwidth, 0.299)
+
+    def test_coord_test_one_freq(self):
+        coord = Coordination()
+        imd_thirds = [470,480,490]
+        imd_fifths = [500,510,520]
+        failing_test_freqs_for_in_imd_products = [470, 500]
+        passing_test_freqs = []
+        for freq in failing_test_freqs_for_in_imd_products:
+            result = coord.test_one_freq(freq, imd_thirds, imd_fifths)
+            self.assertEqual(False, result)
+        # add a freq to the coordination to check for spacing test
+        coord.coordinated_freqs.append_(481)
+        result = coord.test_one_freq(481, imd_thirds, imd_fifths)
+        self.assertEqual(False,result)
+
+    def test_just_run_a_damn_coordination_already(self):
+        """
+        the default coordination settings will return some sort of result
+        """
+        coord = Coordination()
+        coord.run_a_test()
+        self.assertGreater(len(coord.coordinated_freqs.get_freq_values()), 0)
+        self.assertGreater(len(coord.uncoordinated_freqs.get_freq_values()), 0)
+        self.assertGreater(len(coord.imd_thirds), 0)
+        self.assertGreater(len(coord.imd_fifths), 0)
+
+
+        
+
+
 
 if __name__ == '__main__':
     unittest.main()
