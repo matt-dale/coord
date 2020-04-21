@@ -35,23 +35,32 @@ class Coordination(object):
             # bail out early if there is a direct hit with any of the IMDs
             if freq in self.imd_thirds or freq in self.imd_fifths:
                 continue
-            elif freq in uncoordinated_freqs: #we've already tested this one
+            elif freq in uncoordinated_freqs: #we've already tested this one, so bail out
                 continue
             elif self.coordinated_freqs.length() == 0:
                 # if there are no freqs to test against, then just assume it's ok 
-                # TODO:  check against known DTV and any supplied freqs
+                # TODO:  check against known DTV and any other requirements
                 self.coordinated_freqs.append_(freq)
             else:
                 # test this freq against all others in the coordinated list
-                # create a copy of the existing coordinated_freqs and add the test freq to it 
+                # create a copy of the existing coordinated_freqs and add the test freq to it for testing
                 test_list = FrequencyList(self.coordinated_freqs.get_freq_values())
                 test_list.append_(freq)
                 thirds, fifths = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_list)
+                test_imds = thirds + fifths # make one list for checking if current freqs are in the new IMDs
                 if self.test_one_freq(freq, thirds, fifths):
-                    # if the freq passes the IMD tests, then add it to coordinated_freqs and add all the IMDs to the respective lists
-                    self.coordinated_freqs.append_(freq)
-                    self.imd_thirds.append(thirds)
-                    self.imd_fifths.append(fifths)
+                    results = True
+                    # if the freq passes the IMD tests, then make sure that any new generated IMD products don't interfere with existing freqs
+                    for f in self.coordinated_freqs.get_freq_values():
+                        if f in test_imds:
+                            results = False
+                    if results:
+                        self.coordinated_freqs.append_(freq)
+                        self.imd_thirds.extend(thirds)
+                        self.imd_fifths.extend(fifths)
+                    else:
+                        # if it doesn't pass the test, just add the freq to uncoordinated_freqs
+                        self.uncoordinated_freqs.append_(freq)
                 else:
                     # if it doesn't pass the test, just add the freq to uncoordinated_freqs
                     self.uncoordinated_freqs.append_(freq)
@@ -66,17 +75,20 @@ class Coordination(object):
         self.run_a_test(start_freq=470.050)
         return
 
-    def test_one_freq(self, freq, imd_thirds, imd_fifths):
+
+    def test_one_freq(self, freq, imd_thirds, imd_fifths, test=False):
         """
         returns Boolean if it meets the spec
         """
         results = True
         low_end = freq - self.default_bandwidth/2
         high_end = freq + self.default_bandwidth/2
-        for cofreq in self.coordinated_freqs.get_freq_values(): # test the freq spacing between all other system freqs
-            if abs(freq-cofreq) < self.default_bandwidth:
-                results = False
-                return results
+        if test == False: # test flag is used to test the coordinated_freqs after generation
+            # transmitter to transmitter spacing check
+            for cofreq in self.coordinated_freqs.get_freq_values(): # test the freq spacing between all other system freqs
+                if abs(freq-cofreq) < self.default_bandwidth:
+                    results = False
+                    return results
 
         if freq in imd_thirds:
             results = False
