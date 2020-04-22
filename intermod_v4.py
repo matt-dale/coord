@@ -3,6 +3,15 @@ import itertools
 import random
 
 
+class IMD(object):
+    """
+    used to hold the type of IMD and it's freq value
+    """
+    def __init__(self, freq, imd_type):
+        self.imd_type = imd_type
+        self.freq = freq
+
+
 class Coordination(object):
     """
     stores the existing state of the coordination
@@ -12,6 +21,7 @@ class Coordination(object):
         self.uncoordinated_freqs = FrequencyList([])
         self.imd_thirds = []
         self.imd_fifths = []
+        self.imd_triples = []
         if start_freq:
             self.start_freq = start_freq
         else:
@@ -19,10 +29,11 @@ class Coordination(object):
         if end_freq:
             self.end_freq = end_freq
         else:
-            self.end_freq = 609
+            self.end_freq = 608
         self.imd_calc = IntermodCalculator(start_freq=self.start_freq, end_freq=self.end_freq, coordination=self)
         self.avoid_imd_thirds_by = 0.099 
         self.avoid_imd_fifths_by = 0.089
+        self.avoid_imd_triples_by = 0.049
         self.default_bandwidth = 0.299
         self.all_potential_freqs = []
         self.create_potential_freqs() # just do it on class instantiation
@@ -69,17 +80,29 @@ class Coordination(object):
         test_frequency_list.append_(test_freq)
 
         # calculate the imd_thirds and imd_fifths generated from this set
-        imd_thirds, imd_fifths = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_frequency_list)
+        imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_frequency_list)
 
         if test_freq in imd_thirds:
             results = False
-        elif test_freq in imd_fifths:
+        if test_freq in imd_fifths:
+            results = False
+        if test_freq in imd_triples:
             results = False
         else:
             # check for spacings from IMD products
             # create lists from all imd thirds and all imd fifths
             combined_thirds_list = imd_thirds+self.imd_thirds
             combined_fifths_list = imd_fifths+self.imd_fifths
+            combined_triples_list = imd_triples+self.imd_triples
+            """
+            SOOO MANY LOOPS HERE. THIS IS INCREDIBLY INEFFICIENT
+            MAKE THIS GOOD, please
+
+            Can we make an IMD product an object with a type associated with it?
+            Then we can make one list of IMD products and check the diffs based on the type
+            One loop for all the IMD products, one loop for existing freqs check
+            """
+
             for third in combined_thirds_list:
                 if abs(third-test_freq) <= self.avoid_imd_thirds_by:
                     results = False
@@ -89,11 +112,40 @@ class Coordination(object):
                 if abs(fifth-test_freq) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
+
+            for triple in combined_triples_list:
+                if abs(triple-test_freq) <= self.avoid_imd_triples_by:
+                    results = False
+                    return results
+
+            # if the freq passes the IMD tests, then make sure that any new generated IMD products don't interfere with existing freqs
+            for f in coordinated_freqs:
+                for third in combined_thirds_list:
+                    if abs(third-f) <= self.avoid_imd_thirds_by: # this will find direct hits and spacing with the existing set
+                        results = False
+                        return results
+
+                for fifth in combined_fifths_list:
+                    if abs(fifth-f) <= self.avoid_imd_fifths_by:
+                        results = False
+                        return results
+
+                for triple in combined_triples_list:
+                    if abs(triple-f) <= self.avoid_imd_triples_by:
+                        results = False
+                        return results
+
+            """
+            END OF TERRIBLY INEFFICIENT CODE>  
+            """
+
             if results == True:
                 # at this point, we've passed all the tests, so add it the imds and coordinated freqs
                 self.imd_thirds.extend(imd_thirds)
                 self.imd_fifths.extend(imd_fifths)
                 self.coordinated_freqs.append_(test_freq)
+            else:
+                self.uncoordinated_freqs.append_(test_freq)
 
         return results
 
@@ -102,7 +154,7 @@ class Coordination(object):
         run a test coordination:
         1 - get a random freq from the possible freqs
         2 - add freq to a temporary system and calculate IMD
-        3 - evaluate whether to keep the freq or try another one 
+        3 - evaluate whether to keep the freq or try another one happens in the method above
         """
         self.create_potential_freqs()
         while len(self.all_potential_freqs) > 0:
@@ -189,11 +241,12 @@ class IntermodCalculator(object):
     3 - Calculate 3rd order intermods and 5th order intermods for each possible pair of frequencies in the list and add it to the intermod lists
     4 - If any of the freqs in the intermod list are within 0.1 MHz of a frequency in the first list, move it by 0.125 and recalculate the lists
     """
-    def __init__(self, start_freq=490, end_freq=500, thirds=True, fifths=True, coordination=None, **kwargs):
+    def __init__(self, start_freq=490, end_freq=500, thirds=True, fifths=True, triple_beats=True, coordination=None, **kwargs):
         self.start_freq = start_freq
         self.end_freq = end_freq
         self.thirds = thirds
         self.fifths = fifths
+        self.triple_beats = triple_beats
         self.coordination = coordination # reserved for later use
 
     def calculate_imd_between_one_set_of_freqs(self, freqs1):
@@ -202,13 +255,21 @@ class IntermodCalculator(object):
         """
         imd_thirds = []
         imd_fifths = []
-        freqs_to_test = freqs1.create_freq_test_list_from_itself()
-        for freq_pair in freqs_to_test:
+        imd_triples = []
+        freq_pairs = freqs1.create_freq_test_list_from_itself()
+        for freq_pair in freq_pairs:
             thirds, fifths = self.calculate_imds(freq_pair[0], freq_pair[1])
             imd_thirds.extend(thirds)
             imd_fifths.extend(fifths)
-
-        return imd_thirds, imd_fifths
+        if self.triple_beats:  
+            # don't waste time checking for each combo if we don't need to. There's a safety measure of checking in the calculation too
+            freq_thirds = freqs1.create_freq_test_list_from_itself(3)
+            for freq_combo in freq_thirds:
+                f1 = freq_combo[0]
+                f2 = freq_combo[1]
+                f3 = freq_combo[2]
+                triples = self.calculate_triple_beats(f1, f2, f3)
+        return imd_thirds, imd_fifths, imd_triples
     
 
     def calculate_imd_between_two_sets(self, freqs1, freqs2):
