@@ -2,35 +2,20 @@ import collections
 import itertools
 import random
 
+
 """
-given_value = 2
-a_list = [1, 5, 8]
-absolute_difference_function = lambda list_value : abs(list_value - given_value)
-closest_value = min(a_list, key=absolute_difference_function)
+for profiling, keep the same set of variables, start=470, stop = 500, and don't calculate triple_beats
+v4 found instantiating IMD as an object for all the 5million IMD products is a time waster.
+v5, remove that class creation and use three seperate loops saved tons of time
+v6, adding in the check on self.coordinated freqs spacing against the IMD products
+v7, removing round from all locations and changing abs to local in the function
 """
-
-
-class IMD(object):
-    """
-    used to hold the type of IMD and it's freq value
-    """
-    def __init__(self, freq, imd_type):
-        self.imd_type = imd_type
-        self.freq = freq
-
-    @classmethod
-    def build_set_of_imds(cls, flist, order):
-        """
-        creates a set of IMDs given the list
-        """
-        return [cls(f, order) for f in flist]
-
 
 class Coordination(object):
     """
     stores the existing state of the coordination
     """
-    def __init__(self, start_freq=None, end_freq=None, *args, **kwargs):
+    def __init__(self, start_freq=None, end_freq=None, thirds=True, fifths=True, triples=False, *args, **kwargs):
         self.coordinated_freqs = FrequencyList([])
         self.uncoordinated_freqs = FrequencyList([])
         self.imd_thirds = []
@@ -43,8 +28,15 @@ class Coordination(object):
         if end_freq:
             self.end_freq = end_freq
         else:
-            self.end_freq = 608
-        self.imd_calc = IntermodCalculator(start_freq=self.start_freq, end_freq=self.end_freq, coordination=self)
+            self.end_freq = 500 # 608 is a reasonable ending
+
+        self.thirds = thirds
+        self.fifths = fifths
+        self.triple_beats = triples
+        self.imd_calc = IntermodCalculator(start_freq=self.start_freq, 
+                                            end_freq=self.end_freq, thirds=self.thirds, 
+                                            fifths=self.fifths, triple_beats=self.triple_beats, 
+                                            coordination=self)
         self.avoid_imd_thirds_by = 0.099 
         self.avoid_imd_fifths_by = 0.089
         self.avoid_imd_triples_by = 0.049
@@ -61,7 +53,7 @@ class Coordination(object):
         self.all_potential_freqs = []
         loop_freq = self.start_freq
         while loop_freq < self.end_freq:
-            self.all_potential_freqs.append(round(loop_freq, 4))
+            self.all_potential_freqs.append(loop_freq)
             loop_freq += 0.025
         return
 
@@ -77,9 +69,10 @@ class Coordination(object):
             raise ValueError('potential freqs have not been populated yet, this has been run out of order')
 
 
-    def test_one_freq(self, test_freq, test=False):
+    def test_one_freq(self, test_freq, test=False, abs=abs):
         """
         returns Boolean if it meets the spec
+        return out early if at all possible to save times
         """
         build_set_of_imds = IMD.build_set_of_imds
         results = True
@@ -93,50 +86,68 @@ class Coordination(object):
         # create a copy of the existing freqs and add the potential freq to it
         test_frequency_list = FrequencyList(coordinated_freqs)
         test_frequency_list.append_(test_freq)
-
         # calculate the imd_thirds and imd_fifths generated from this set
         imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_frequency_list)
 
         if test_freq in imd_thirds:
-            results = False
+            return False
         if test_freq in imd_fifths:
-            results = False
+            return False
         if test_freq in imd_triples:
-            results = False
+            return False
         else:
             # check for spacings from IMD products
             # create lists from all imd thirds and all imd fifths
-            combined_thirds_list = build_set_of_imds(imd_thirds+self.imd_thirds, 'thirds')
-            combined_fifths_list = build_set_of_imds(imd_fifths+self.imd_fifths, 'fifths')
-            combined_triples_list = build_set_of_imds(imd_triples+self.imd_triples, 'triples')
+            combined_thirds_list = imd_thirds+self.imd_thirds
+            combined_fifths_list = imd_fifths+self.imd_fifths
+            combined_triples_list = imd_triples+self.imd_triples
 
             all_imds = set(combined_fifths_list+combined_thirds_list+combined_triples_list)
-
+            
             """
-            SOOO MANY LOOPS HERE. THIS IS INCREDIBLY INEFFICIENT
-            MAKE THIS GOOD, please
+            SOOO long here 
+            This imd list could be millions of freqs
             """
-            for imd in all_imds:
+            for imd in combined_thirds_list:
                 # test for third
-                difference = abs(imd.freq-test_freq)
-                if imd.imd_type == 'thirds':
-                    if difference <= self.avoid_imd_thirds_by:
+                difference = abs(imd-test_freq)
+                if difference <= self.avoid_imd_thirds_by:
+                    self.uncoordinated_freqs.append_(test_freq)
+                    return False
+                for f in coordinated_freqs:
+                    f_difference = abs(imd-f)
+                    if f_difference <= self.avoid_imd_thirds_by:
                         self.uncoordinated_freqs.append_(test_freq)
                         return False
 
-                # test for fifth
-                if imd.imd_type == 'fifths':
-                    if difference <= self.avoid_imd_fifths_by:
+            for imd in combined_fifths_list:
+                difference = abs(imd-test_freq)
+                if difference <= self.avoid_imd_fifths_by:
+                    self.uncoordinated_freqs.append_(test_freq)
+                    return False
+                for f in coordinated_freqs:
+                    f_difference = abs(imd-f)
+                    if f_difference <= self.avoid_imd_fifths_by:
+                        self.uncoordinated_freqs.append_(test_freq)
+                        return False
+
+            for imd in combined_triples_list:
+                # test for triple
+                difference = abs(imd-test_freq)
+                if difference <= self.avoid_imd_triples_by:
+                    self.uncoordinated_freqs.append_(test_freq)
+                    return False
+                for f in coordinated_freqs:
+                    f_difference = abs(imd-f)
+                    if f_difference <= self.avoid_imd_triples_by:
                         self.uncoordinated_freqs.append_(test_freq)
                         return False
                 
-                # test for triple
-                if imd.imd_type == 'triples':
-                    if difference <= self.avoid_imd_triples_by:
-                        self.uncoordinated_freqs.append_(test_freq)
-                        return False
-
-                for f in coordinated_freqs: # coordinated list is much smaller than all the imds, so loop thru it here?
+                ''' WE DIDN"T TEST THIS IN V4, leave it out in V5 for now
+                    adding this back in for V6
+                    do we add it above? loop thru for each IMD? V6 is added above
+                for f in coordinated_freqs: 
+                    # coordinated list is much smaller than all the imds, so loop thru it here? this will be looped through so many times
                     f_difference = abs(imd.freq-f)
                     if imd.imd_type == 'thirds':
                         if f_difference <= self.avoid_imd_thirds_by:
@@ -151,17 +162,17 @@ class Coordination(object):
                     if imd.imd_type == 'triples':
                         if f_difference <= self.avoid_imd_triples_by:
                             self.uncoordinated_freqs.append_(test_freq)
-                            return False
+                            return False'''
 
 
-            if results == True:
-                # at this point, we've passed all the tests, so add the imds and coordinated freqs
-                self.imd_thirds.extend(imd_thirds)
-                self.imd_fifths.extend(imd_fifths)
-                self.imd_triples.extend(imd_triples)
-                self.coordinated_freqs.append_(test_freq)
-            else:
-                self.uncoordinated_freqs.append_(test_freq)
+        if results == True:
+            # at this point, we've passed all the tests, so add the imds and coordinated freqs
+            self.imd_thirds.extend(imd_thirds)
+            self.imd_fifths.extend(imd_fifths)
+            self.imd_triples.extend(imd_triples)
+            self.coordinated_freqs.append_(test_freq)
+        else:
+            self.uncoordinated_freqs.append_(test_freq)
 
         return results
 
@@ -235,6 +246,7 @@ class FrequencyList(object):
 class Frequency(object):
     """
     rather than store this as a string, store data about the freq for the coordination
+    future features will need this
     """
 
     def __init__(self, value, *args, **kwargs):
@@ -248,14 +260,26 @@ class Frequency(object):
         return str(self.freq)
 
 
+class IMD(object):
+    """
+    used to hold the type of IMD and it's freq value
+    """
+    def __init__(self, freq, imd_type):
+        self.imd_type = imd_type
+        self.freq = freq
+
+    @classmethod
+    def build_set_of_imds(cls, flist, order):
+        """
+        creates a set of IMDs given the list
+        """
+        return [cls(f, order) for f in flist]
+
+
 class IntermodCalculator(object):
     """
     used for calculating IMD products for wireless microphone frequency selection
     frequencies are in MHz
-    1 - Goal to create a list of frequencies that are spaced between the start freq and the end freq
-    2 - Each frequency should be spaced at least self.spacing apart
-    3 - Calculate 3rd order intermods and 5th order intermods for each possible pair of frequencies in the list and add it to the intermod lists
-    4 - If any of the freqs in the intermod list are within 0.1 MHz of a frequency in the first list, move it by 0.125 and recalculate the lists
     """
     def __init__(self, start_freq=490, end_freq=500, thirds=True, fifths=True, triple_beats=True, coordination=None, **kwargs):
         self.start_freq = start_freq
@@ -339,9 +363,9 @@ class IntermodCalculator(object):
             #a = round((3*f1),3)
             #b = round((3*f2),3)
             #c = round(((2*f1)+f2),3)
-            d = round(((2*f1)-f2),3)
+            d = (2*f1)-f2
             #e = round(((2*f2)+f1),3)
-            f = round(((2*f2)-f1),3)
+            f = (2*f2)-f1
             bad_freqs = set([d,f])
         return bad_freqs
 
@@ -351,8 +375,8 @@ class IntermodCalculator(object):
         """
         if self.fifths:
             #a = round(((3*f1)+(2*f2)),3)
-            b = round(((3*f1)-(2*f2)),3)
+            b = (3*f1)-(2*f2)
             #c = round(((3*f2)+(2*f1)),3)
-            d = round(((3*f2)-(2*f1)),3)
+            d = (3*f2)-(2*f1)
             bad_freqs = set([b,d])
         return bad_freqs
