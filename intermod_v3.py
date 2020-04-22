@@ -86,8 +86,6 @@ class Coordination(object):
         """
         after the above test has run, attempt to get more frequencies by picking a different list 
         to choose from
-
-        mind the gap: 609.125, 610.625 MHz, 613.50 rejected from WWB
         """
         # find a good freq to start from based on the largest gaps in the existing coordinated freqs
         # where's the biggest gap in freqs?
