@@ -121,30 +121,36 @@ class Coordination(object):
                 difference = abs(imd.freq-test_freq)
                 if imd.imd_type == 'thirds':
                     if difference <= self.avoid_imd_thirds_by:
+                        self.uncoordinated_freqs.append_(test_freq)
                         return False
 
                 # test for fifth
                 if imd.imd_type == 'fifths':
                     if difference <= self.avoid_imd_fifths_by:
+                        self.uncoordinated_freqs.append_(test_freq)
                         return False
                 
                 # test for triple
                 if imd.imd_type == 'triples':
                     if difference <= self.avoid_imd_triples_by:
+                        self.uncoordinated_freqs.append_(test_freq)
                         return False
 
                 for f in coordinated_freqs: # coordinated list is much smaller than all the imds, so loop thru it here?
                     f_difference = abs(imd.freq-f)
                     if imd.imd_type == 'thirds':
                         if f_difference <= self.avoid_imd_thirds_by:
+                            self.uncoordinated_freqs.append_(test_freq)
                             return False
 
                     if imd.imd_type == 'fifths':
                         if f_difference <= self.avoid_imd_fifths_by:
+                            self.uncoordinated_freqs.append_(test_freq)
                             return False
                     
                     if imd.imd_type == 'triples':
                         if f_difference <= self.avoid_imd_triples_by:
+                            self.uncoordinated_freqs.append_(test_freq)
                             return False
 
 
@@ -152,6 +158,7 @@ class Coordination(object):
                 # at this point, we've passed all the tests, so add the imds and coordinated freqs
                 self.imd_thirds.extend(imd_thirds)
                 self.imd_fifths.extend(imd_fifths)
+                self.imd_triples.extend(imd_triples)
                 self.coordinated_freqs.append_(test_freq)
             else:
                 self.uncoordinated_freqs.append_(test_freq)
