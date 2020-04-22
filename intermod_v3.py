@@ -4,7 +4,7 @@ class Coordination(object):
     """
     stores the existing state of the coordination
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, start_freq=None, end_freq=None, *args, **kwargs):
         self.coordinated_freqs = FrequencyList([])
         self.uncoordinated_freqs = FrequencyList([])
         self.band = 'UHF'
@@ -12,12 +12,21 @@ class Coordination(object):
         self.high_stop = 950
         self.imd_thirds = []
         self.imd_fifths = []
-        self.imd_calc = IntermodCalculator(start_freq=470, end_freq=615, coordination=self)
+        if start_freq:
+            self.start_freq = start_freq
+        else:
+            self.start_freq = 470
+        if end_freq:
+            self.end_freq = end_freq
+        else:
+            self.end_freq = 609
+        self.imd_calc = IntermodCalculator(start_freq=self.start_freq, end_freq=self.end_freq, coordination=self)
+        self.last_run_start_freq = self.start_freq
         self.avoid_imd_thirds_by = 0.099 
         self.avoid_imd_fifths_by = 0.089
         self.default_bandwidth = 0.299
 
-    def run_a_test(self, start_freq=None):
+    def run_a_test(self, start_freq=None, step_size=None):
         """
         run a test coordination:
         1 - get a list of freqs that we'd like to test from the imd_calc
@@ -27,11 +36,11 @@ class Coordination(object):
 
         490, 490.375, 491.375, 491.75, 493.75, 494.75, 495.5, 496.5, 498.75
         """
-        test_frequencies = self.imd_calc.get_freqs(start_freq=start_freq)
+        potential_frequencies = self.imd_calc.get_freqs(start_freq=start_freq, step_size=None)
         uncoordinated_freqs = self.uncoordinated_freqs.get_freq_values() # these are freqs that we've already tested
         # if the test has already been run, double check for freqs we've already tested and remove them from the list
-        test_frequencies = list(set(test_frequencies+uncoordinated_freqs))
-        for freq in test_frequencies:
+        potential_frequencies = list(set(potential_frequencies+uncoordinated_freqs))
+        for freq in potential_frequencies:
             # bail out early if there is a direct hit with any of the IMDs
             if freq in self.imd_thirds or freq in self.imd_fifths:
                 continue
@@ -65,6 +74,14 @@ class Coordination(object):
                     # if it doesn't pass the test, just add the freq to uncoordinated_freqs
                     self.uncoordinated_freqs.append_(freq)
 
+    def create_file_for_IAS_import(self):
+        """
+        used to bring in freqs to IAS
+        """
+        with open('test_freqs.csv', 'w') as outFile:
+            h = ','.join([str(x) for x in self.coordinated_freqs.get_freq_values()])
+            outFile.write(h+'\r\n')
+
     def run_a_test_for_additional_freqs(self):
         """
         after the above test has run, attempt to get more frequencies by picking a different list 
@@ -72,7 +89,21 @@ class Coordination(object):
 
         mind the gap: 609.125, 610.625 MHz, 613.50 rejected from WWB
         """
-        self.run_a_test(start_freq=470.050)
+        # find a good freq to start from based on the largest gaps in the existing coordinated freqs
+        # where's the biggest gap in freqs?
+        largest_spacing = 0
+        sorted_freqs = sorted(self.coordinated_freqs.get_freq_values())
+        current_freq = sorted_freqs[0]
+        start_of_largest_gap = current_freq
+        for freq in sorted_freqs[1:]:
+            spacing = freq - current_freq
+            if spacing > largest_spacing:
+                largest_spacing = spacing
+                start_of_largest_gap = current_freq
+            current_freq = freq
+        # there's a gap here, so start here plus an offset
+        start_freq = start_of_largest_gap - 0.025
+        self.run_a_test(start_freq=start_of_largest_gap)
         return
 
 
@@ -81,8 +112,6 @@ class Coordination(object):
         returns Boolean if it meets the spec
         """
         results = True
-        low_end = freq - self.default_bandwidth/2
-        high_end = freq + self.default_bandwidth/2
         if test == False: # test flag is used to test the coordinated_freqs after generation
             # transmitter to transmitter spacing check
             for cofreq in self.coordinated_freqs.get_freq_values(): # test the freq spacing between all other system freqs
@@ -96,30 +125,35 @@ class Coordination(object):
             results = False
         else:
             #check for spacings from IMD products
-            for third in imd_thirds:
+            # create lists from all imd thirds and all imd fifths
+            combined_thirds_list = imd_thirds+self.imd_thirds
+            combined_fifths_list = imd_fifths+self.imd_fifths
+            for third in combined_thirds_list:
                 if abs(third-freq) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
                 
+                """ I misunderstood the leading and trailing edge thing.  that's only for DTV spacing
                 if abs(third-low_end) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
                 if abs(third-high_end) <= self.avoid_imd_thirds_by:
                     results = False
                     return results
-                
-            for fifth in imd_fifths:
+                """
+            for fifth in combined_fifths_list:
                 if abs(fifth-freq) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
                 
+                """
                 if abs(fifth-low_end) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
                 if abs(fifth-high_end) <= self.avoid_imd_fifths_by:
                     results = False
                     return results
-                
+                """
 
         return results
 
@@ -220,7 +254,7 @@ class IntermodCalculator(object):
             self.low_stop = coordination.low_stop
             self.high_stop = coordination.high_stop
 
-    def get_freqs(self, start_freq=None):
+    def get_freqs(self, start_freq=None, step_size=None):
         """
         This function *SHOULD* return a "pre-coordinated" list of freqs, 
         NOT evenly spaced.  But how?
@@ -228,6 +262,10 @@ class IntermodCalculator(object):
         # TODO: after a search fails, provide with a start_freq, offsetted by X amount
         to find more freqs
         """
+        if step_size == None:
+            spacing = self.spacing
+        else:
+            spacing = step_size
         freqs = []
         if start_freq:
             current_freq = start_freq
@@ -235,7 +273,7 @@ class IntermodCalculator(object):
             current_freq = self.start_freq
         while current_freq < self.end_freq:
             freqs.append(current_freq)
-            current_freq += self.spacing
+            current_freq += spacing
         return freqs
 
     def calculate_imd_between_one_set_of_freqs(self, freqs1):
