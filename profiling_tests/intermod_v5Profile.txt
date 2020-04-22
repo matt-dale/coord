@@ -1,0 +1,36 @@
+intermod_v5 Profile
+
+cProfile.runctx('coord.run_a_test()', globals(), locals())
+         2697483 function calls in 2.482 seconds
+
+   Ordered by: standard name
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    2.482    2.482 <string>:1(<module>)
+        1    0.022    0.022    2.482    2.482 intermod_v5.py:160(run_a_test)
+      611    0.000    0.000    0.010    0.000 intermod_v5.py:178(__init__)
+      611    0.006    0.000    0.010    0.000 intermod_v5.py:179(<listcomp>)
+      988    0.001    0.000    0.002    0.000 intermod_v5.py:190(append_)
+     1812    0.001    0.000    0.005    0.000 intermod_v5.py:200(get_freq_values)
+     1812    0.004    0.000    0.004    0.000 intermod_v5.py:201(<listcomp>)
+      611    0.001    0.000    0.003    0.000 intermod_v5.py:203(create_freq_test_list_from_itself)
+    17548    0.004    0.000    0.004    0.000 intermod_v5.py:233(__init__)
+      611    0.199    0.000    1.685    0.003 intermod_v5.py:273(calculate_imd_between_one_set_of_freqs)
+   238605    0.144    0.000    1.392    0.000 intermod_v5.py:303(calculate_imds)
+   238605    0.227    0.000    0.617    0.000 intermod_v5.py:338(calculate_third_order)
+   238605    0.251    0.000    0.631    0.000 intermod_v5.py:353(calculate_fifth_order)
+        1    0.000    0.000    0.002    0.002 intermod_v5.py:46(create_potential_freqs)
+     1201    0.002    0.000    0.011    0.000 intermod_v5.py:58(get_a_freq)
+     1201    0.716    0.001    2.447    0.002 intermod_v5.py:70(test_one_freq)
+     1201    0.002    0.000    0.003    0.000 random.py:224(_randbelow)
+     1201    0.001    0.000    0.004    0.000 random.py:256(choice)
+   509419    0.029    0.000    0.029    0.000 {built-in method builtins.abs}
+        1    0.000    0.000    2.482    2.482 {built-in method builtins.exec}
+     3604    0.001    0.000    0.001    0.000 {built-in method builtins.len}
+   955621    0.771    0.000    0.771    0.000 {built-in method builtins.round}
+     2189    0.000    0.000    0.000    0.000 {method 'append' of 'list' objects}
+     1201    0.000    0.000    0.000    0.000 {method 'bit_length' of 'int' objects}
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+   477303    0.093    0.000    0.093    0.000 {method 'extend' of 'list' objects}
+     1717    0.001    0.000    0.001    0.000 {method 'getrandbits' of '_random.Random' objects}
+     1201    0.005    0.000    0.005    0.000 {method 'remove' of 'list' objects}
