@@ -130,6 +130,39 @@ class TestIMDCalculator(unittest.TestCase):
         self.assertGreater(len(coord.imd_thirds), 0)
         self.assertGreater(len(coord.imd_fifths), 0)
 
+    def test_ias_known_good_freqs(self):
+        """
+        this list of freqs is "coordinated" based on what IAS tells us.  
+        """
+        # this file just has thirds calculated by IAS
+        with open('ias_accepted_3rdfreqs.txt', 'r') as inFile:
+            fList = []
+            for f in inFile.readline().split(','):
+                fList.append(float(f))
+            coord = Coordination()
+            thirds, fifths = coord.imd_calc.calculate_imd_between_one_set_of_freqs(FrequencyList(fList))
+            bad_freqs = []
+            for f in fList:
+                if f in thirds:
+                    bad_freqs.append(f)
+            #print('there are {0} freqs from the original list in the imd calculation!'.format(len(bad_freqs)))
+            # if my calculations are right, then len(bad_freqs) should be zero
+            self.assertEqual(len(bad_freqs), 0)
+        # this file has thirds and fifths calculated by IAS
+        with open('ias_accepted_3rdAnd5thfreqs.txt', 'r') as inFile:
+            fList = []
+            for f in inFile.readline().split(','):
+                fList.append(float(f))
+            coord = Coordination()
+            thirds, fifths = coord.imd_calc.calculate_imd_between_one_set_of_freqs(FrequencyList(fList))
+            bad_freqs = []
+            for f in fList:
+                if f in thirds or f in fifths:
+                    bad_freqs.append(f)
+            self.assertEqual(len(bad_freqs), 0)
+            #print('there are {0} freqs from the original list in the imd calculation!'.format(len(bad_freqs)))
+
+
 
         
 

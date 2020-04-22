@@ -289,12 +289,12 @@ class IntermodCalculator(object):
         if self.thirds:
             #a = round((3*f1),3)
             #b = round((3*f2),3)
-            c = round(((2*f1)+f2),3)
+            #c = round(((2*f1)+f2),3)
             d = round(((2*f1)-f2),3)
-            e = round(((2*f2)+f1),3)
+            #e = round(((2*f2)+f1),3)
             f = round(((2*f2)-f1),3)
             
-            for x in [c,d,e,f]:
+            for x in [d,f]:
                 #if x > self. and x < self.end_freq:
                 bad_freqs.append(x)
         return set(bad_freqs)
