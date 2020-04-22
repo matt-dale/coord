@@ -11,6 +11,13 @@ class IMD(object):
         self.imd_type = imd_type
         self.freq = freq
 
+    @classmethod
+    def build_set_of_imds(cls, flist, order):
+        """
+        creates a set of IMDs given the list
+        """
+        return [cls(f, order) for f in flist]
+
 
 class Coordination(object):
     """
@@ -36,7 +43,7 @@ class Coordination(object):
         self.avoid_imd_triples_by = 0.049
         self.default_bandwidth = 0.299
         self.all_potential_freqs = []
-        self.create_potential_freqs() # just do it on class instantiation
+        self.create_potential_freqs()
 
 
     def create_potential_freqs(self):
@@ -67,6 +74,7 @@ class Coordination(object):
         """
         returns Boolean if it meets the spec
         """
+        build_set_of_imds = IMD.build_set_of_imds
         results = True
         coordinated_freqs = self.coordinated_freqs.get_freq_values()
 
@@ -91,56 +99,50 @@ class Coordination(object):
         else:
             # check for spacings from IMD products
             # create lists from all imd thirds and all imd fifths
-            combined_thirds_list = imd_thirds+self.imd_thirds
-            combined_fifths_list = imd_fifths+self.imd_fifths
-            combined_triples_list = imd_triples+self.imd_triples
+            combined_thirds_list = build_set_of_imds(imd_thirds+self.imd_thirds, 'thirds')
+            combined_fifths_list = build_set_of_imds(imd_fifths+self.imd_fifths, 'fifths')
+            combined_triples_list = build_set_of_imds(imd_triples+self.imd_triples, 'triples')
+
+            all_imds = set(combined_fifths_list+combined_thirds_list+combined_triples_list)
+
             """
             SOOO MANY LOOPS HERE. THIS IS INCREDIBLY INEFFICIENT
             MAKE THIS GOOD, please
-
-            Can we make an IMD product an object with a type associated with it?
-            Then we can make one list of IMD products and check the diffs based on the type
-            One loop for all the IMD products, one loop for existing freqs check
             """
+            for imd in all_imds:
+                # test for third
+                difference = abs(imd.freq-test_freq)
+                if imd.imd_type == 'thirds':
+                    if difference <= self.avoid_imd_thirds_by:
+                        return False
 
-            for third in combined_thirds_list:
-                if abs(third-test_freq) <= self.avoid_imd_thirds_by:
-                    results = False
-                    return results
+                # test for fifth
+                if imd.imd_type == 'fifths':
+                    if difference <= self.avoid_imd_fifths_by:
+                        return False
                 
-            for fifth in combined_fifths_list:
-                if abs(fifth-test_freq) <= self.avoid_imd_fifths_by:
-                    results = False
-                    return results
+                # test for triple
+                if imd.imd_type == 'triples':
+                    if difference <= self.avoid_imd_triples_by:
+                        return False
 
-            for triple in combined_triples_list:
-                if abs(triple-test_freq) <= self.avoid_imd_triples_by:
-                    results = False
-                    return results
+                for f in coordinated_freqs: # coordinated list is much smaller than all the imds, so loop thru it here?
+                    f_difference = abs(imd.freq-f)
+                    if imd.imd_type == 'thirds':
+                        if f_difference <= self.avoid_imd_thirds_by:
+                            return False
 
-            # if the freq passes the IMD tests, then make sure that any new generated IMD products don't interfere with existing freqs
-            for f in coordinated_freqs:
-                for third in combined_thirds_list:
-                    if abs(third-f) <= self.avoid_imd_thirds_by: # this will find direct hits and spacing with the existing set
-                        results = False
-                        return results
+                    if imd.imd_type == 'fifths':
+                        if f_difference <= self.avoid_imd_fifths_by:
+                            return False
+                    
+                    if imd.imd_type == 'triples':
+                        if f_difference <= self.avoid_imd_triples_by:
+                            return False
 
-                for fifth in combined_fifths_list:
-                    if abs(fifth-f) <= self.avoid_imd_fifths_by:
-                        results = False
-                        return results
-
-                for triple in combined_triples_list:
-                    if abs(triple-f) <= self.avoid_imd_triples_by:
-                        results = False
-                        return results
-
-            """
-            END OF TERRIBLY INEFFICIENT CODE>  
-            """
 
             if results == True:
-                # at this point, we've passed all the tests, so add it the imds and coordinated freqs
+                # at this point, we've passed all the tests, so add the imds and coordinated freqs
                 self.imd_thirds.extend(imd_thirds)
                 self.imd_fifths.extend(imd_fifths)
                 self.coordinated_freqs.append_(test_freq)
@@ -196,7 +198,7 @@ class FrequencyList(object):
         """
         creats the list of pairs of Frequency objects to test for IMD
         """
-        freq_list = list(itertools.combinations(self.get_freq_values(), number_of_xmitters))
+        freq_list = itertools.combinations(self.get_freq_values(), number_of_xmitters)
         return freq_list
 
     def create_freq_test_list_from_another_list(self, another_list, number_of_xmitters=2):
@@ -211,7 +213,7 @@ class FrequencyList(object):
         else:
             raise TypeError('Wrong type of list provided to create a new frequency list.')
         
-        freq_list = list(itertools.combinations(combined_list, number_of_xmitters))
+        freq_list = itertools.combinations(combined_list, number_of_xmitters)
 
         return freq_list
 
@@ -311,7 +313,7 @@ class IntermodCalculator(object):
             n = (3*f3) - (2*f1)
             o = (3*f2) - (2*f3)
             p = (3*f3) - (2*f2)
-            bad_freqs = set(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p)
+            bad_freqs = set([a,b,c,e,f,g,h,i,j,k,l,m,n,o,p])
         return bad_freqs
 
     def calculate_third_order(self, f1, f2):
@@ -326,7 +328,7 @@ class IntermodCalculator(object):
             d = round(((2*f1)-f2),3)
             #e = round(((2*f2)+f1),3)
             f = round(((2*f2)-f1),3)
-            bad_freqs = set(d,f)
+            bad_freqs = set([d,f])
         return bad_freqs
 
     def calculate_fifth_order(self, f1, f2):
@@ -338,5 +340,5 @@ class IntermodCalculator(object):
             b = round(((3*f1)-(2*f2)),3)
             #c = round(((3*f2)+(2*f1)),3)
             d = round(((3*f2)-(2*f1)),3)
-            bad_freqs = set(b,d)
+            bad_freqs = set([b,d])
         return bad_freqs
