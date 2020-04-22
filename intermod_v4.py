@@ -293,20 +293,32 @@ class IntermodCalculator(object):
         F1 + F3 – F2
         F2 + F3 – F1
         """
-        bad_freqs = []
         if self.triple_beats:
             a = f1 + f2 - f3
             b = f1 + f3 - f2
             c = f2 + f3 - f1
-            for x in [a,b,c]:
-                bad_freqs.append(x)
-        return set(bad_freqs)
+            # third order
+            e = (2*f1) - f2
+            f = (2*f2) - f1
+            g = (2*f1) - f3
+            h = (2*f3) - f1
+            i = (2*f2) - f3
+            j = (2*f3) - f2 
+            # fifth order
+            k = (3*f1) - (2*f2)
+            l = (3*f2) - (2*f1)
+            m = (3*f1) - (2*f3)
+            n = (3*f3) - (2*f1)
+            o = (3*f2) - (2*f3)
+            p = (3*f3) - (2*f2)
+            bad_freqs = set(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p)
+        return bad_freqs
 
     def calculate_third_order(self, f1, f2):
         """
         simply calculates the third order products
         """
-        bad_freqs = []
+
         if self.thirds:
             #a = round((3*f1),3)
             #b = round((3*f2),3)
@@ -314,23 +326,17 @@ class IntermodCalculator(object):
             d = round(((2*f1)-f2),3)
             #e = round(((2*f2)+f1),3)
             f = round(((2*f2)-f1),3)
-            
-            for x in [d,f]:
-                #if x > self. and x < self.end_freq:
-                bad_freqs.append(x)
-        return set(bad_freqs)
+            bad_freqs = set(d,f)
+        return bad_freqs
 
     def calculate_fifth_order(self, f1, f2):
         """
         
         """
-        bad_freqs = []
         if self.fifths:
             #a = round(((3*f1)+(2*f2)),3)
             b = round(((3*f1)-(2*f2)),3)
             #c = round(((3*f2)+(2*f1)),3)
             d = round(((3*f2)-(2*f1)),3)
-            for x in [b,d]:
-                #if x > self.start_freq and x < self.end_freq:
-                bad_freqs.append(x)
-        return set(bad_freqs)
+            bad_freqs = set(b,d)
+        return bad_freqs
