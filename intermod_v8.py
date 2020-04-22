@@ -7,8 +7,8 @@ import random
 for profiling, keep the same set of variables, start=470, stop = 500, and don't calculate triple_beats
 v4 found instantiating IMD as an object for all the 5million IMD products is a time waster.
 v5, remove that class creation and use three seperate loops saved tons of time
-v6, adding in the check on self.coordinated freqs spacing against the IMD products
-v7, removing round from all locations and changing abs to local in the function
+v6, adding in the check on self.coordinated freqs spacing against the IMD products, notably increase in time. 
+v7, removing round from all locations and changing abs to local in the function - very little change
 """
 
 class Coordination(object):
@@ -28,7 +28,7 @@ class Coordination(object):
         if end_freq:
             self.end_freq = end_freq
         else:
-            self.end_freq = 500 # 608 is a reasonable ending
+            self.end_freq = 608 # 608 is a reasonable ending
 
         self.thirds = thirds
         self.fifths = fifths
@@ -74,7 +74,7 @@ class Coordination(object):
         returns Boolean if it meets the spec
         return out early if at all possible to save times
         """
-        build_set_of_imds = IMD.build_set_of_imds
+
         results = True
         coordinated_freqs = self.coordinated_freqs.get_freq_values()
 
@@ -83,11 +83,30 @@ class Coordination(object):
             if abs(test_freq-cofreq) < self.default_bandwidth:
                 results = False
                 return results
-        # create a copy of the existing freqs and add the potential freq to it
-        test_frequency_list = FrequencyList(coordinated_freqs)
-        test_frequency_list.append_(test_freq)
+        # search for direct hits first to avoid calculating unneccessary imds
+        if test_freq in self.imd_thirds:
+            return False
+        if test_freq in self.imd_fifths:
+            return False
+        if test_freq in self.imd_triples:
+            return False
+        # only generate a list of freq parirs that we haven't tested yet! V8 change
+       
+
         # calculate the imd_thirds and imd_fifths generated from this set
-        imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_frequency_list)
+        # am i wasting time here by recalculating all the IMD pairs which I've already done?
+        # >> look here we're re-testing freq pairs that we've already tested!!!!!!
+        ### >>>><<<<><><><><><><><><>><><><><><><>########
+        if len(coordinated_freqs) == 0:
+            # create a copy of the existing freqs and add the potential freq to it
+            test_frequency_list = FrequencyList(coordinated_freqs)
+            test_frequency_list.append_(test_freq)
+            imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_frequency_list)
+        else:
+            # provide it an explicit list to test!
+            explicit_test_frequency_list = [(test_freq, f) for f in coordinated_freqs]
+            f = FrequencyList([])
+            imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(f, explicit_test_frequency_list)
 
         if test_freq in imd_thirds:
             return False
@@ -105,7 +124,7 @@ class Coordination(object):
             all_imds = set(combined_fifths_list+combined_thirds_list+combined_triples_list)
             
             """
-            SOOO long here 
+            SOOO long of a wait here 
             This imd list could be millions of freqs
             """
             for imd in combined_thirds_list:
@@ -142,28 +161,6 @@ class Coordination(object):
                     if f_difference <= self.avoid_imd_triples_by:
                         self.uncoordinated_freqs.append_(test_freq)
                         return False
-                
-                ''' WE DIDN"T TEST THIS IN V4, leave it out in V5 for now
-                    adding this back in for V6
-                    do we add it above? loop thru for each IMD? V6 is added above
-                for f in coordinated_freqs: 
-                    # coordinated list is much smaller than all the imds, so loop thru it here? this will be looped through so many times
-                    f_difference = abs(imd.freq-f)
-                    if imd.imd_type == 'thirds':
-                        if f_difference <= self.avoid_imd_thirds_by:
-                            self.uncoordinated_freqs.append_(test_freq)
-                            return False
-
-                    if imd.imd_type == 'fifths':
-                        if f_difference <= self.avoid_imd_fifths_by:
-                            self.uncoordinated_freqs.append_(test_freq)
-                            return False
-                    
-                    if imd.imd_type == 'triples':
-                        if f_difference <= self.avoid_imd_triples_by:
-                            self.uncoordinated_freqs.append_(test_freq)
-                            return False'''
-
 
         if results == True:
             # at this point, we've passed all the tests, so add the imds and coordinated freqs
@@ -289,14 +286,17 @@ class IntermodCalculator(object):
         self.triple_beats = triple_beats
         self.coordination = coordination # reserved for later use
 
-    def calculate_imd_between_one_set_of_freqs(self, freqs1):
+    def calculate_imd_between_one_set_of_freqs(self, freqs1, explicit_list=None):
         """
         accepts a FrequencyList object and returns a two lists of IMD products
         """
         imd_thirds = []
         imd_fifths = []
         imd_triples = []
-        freq_pairs = freqs1.create_freq_test_list_from_itself()
+        if not explicit_list:
+            freq_pairs = freqs1.create_freq_test_list_from_itself()
+        else:
+            freq_pairs = explicit_list
         for freq_pair in freq_pairs:
             thirds, fifths = self.calculate_imds(freq_pair[0], freq_pair[1])
             imd_thirds.extend(thirds)
