@@ -100,7 +100,11 @@ class Coordination(object):
             return False
 
         test_frequency_list = FrequencyList(coordinated_freqs, added_freq=test_freq)
-        imd_triples, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_frequency_list)
+        xmit_qty = 2
+        if self.triple_beats:
+            xmit_qty = 3
+        test_list = test_frequency_list.create_freq_test_list_from_itself(xmit_qty)
+        imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_list)
 
 
         if test_freq in imd_thirds:
