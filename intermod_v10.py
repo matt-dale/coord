@@ -47,6 +47,11 @@ class Coordination(object):
         self.all_potential_freqs = []
         self.create_potential_freqs()
 
+    def create_file_for_IAS_import(self):
+        with open('exported_freqs.csv', 'w') as outFile:
+            h = ','.join([str(x) for x in self.coordinated_freqs.get_freq_values()])
+            outFile.write(h+'\r\n')
+
 
     def create_potential_freqs(self):
         """
@@ -72,7 +77,7 @@ class Coordination(object):
             raise ValueError('potential freqs have not been populated yet, this has been run out of order')
 
 
-    def test_one_freq(self, test_freq, test=False, abs=abs):
+    def test_one_freq(self, test_freq):
         """
         returns Boolean if it meets the spec
         return out early if at all possible to save times
@@ -93,17 +98,10 @@ class Coordination(object):
             return False
         if test_freq in self.imd_triples:
             return False
-        # only generate a list of freq parirs that we haven't tested yet! V8 change
-        if len(coordinated_freqs) == 0:
-            # create a copy of the existing freqs and add the potential freq to it
-            test_frequency_list = FrequencyList(coordinated_freqs)
-            test_frequency_list.append_(test_freq)
-            imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_frequency_list)
-        else:
-            # provide it an explicit list to test!
-            explicit_test_frequency_list = [(test_freq, f) for f in coordinated_freqs]
-            f = FrequencyList([])
-            imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(f, explicit_test_frequency_list)
+
+        test_frequency_list = FrequencyList(coordinated_freqs, added_freq=test_freq)
+        imd_triples, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_frequency_list)
+
 
         if test_freq in imd_thirds:
             return False
@@ -188,8 +186,9 @@ class FrequencyList(object):
     """
     just a collection of Frequency objects
     """
-    def __init__(self, list_of_freqs, *args, **kwargs):
+    def __init__(self, list_of_freqs, added_freq=None, *args, **kwargs):
         self.freq_list = [Frequency(f) for f in list_of_freqs]
+        self.added_freq = added_freq
 
     def __str__(self):
         return ','.join(str(f) for f in self.freq_list)
@@ -215,9 +214,16 @@ class FrequencyList(object):
 
     def create_freq_test_list_from_itself(self, number_of_xmitters=2):
         """
-        creats the list of pairs of Frequency objects to test for IMD
+        creates the list of pairs of Frequency objects to test for IMD
         """
-        freq_list = itertools.combinations(self.get_freq_values(), number_of_xmitters)
+        if self.added_freq:
+            if number_of_xmitters == 2:
+                freq_list = [(self.added_freq, f) for f in self.get_freq_values()]
+            if number_of_xmitters == 3:
+                two_xmit_list = itertools.combinations(self.get_freq_values(), 2) # all existing 2Xmit combos, now add the new freq to it
+                freq_list = [(self.added_freq, f[0], f[1]) for f in two_xmit_list]
+        else:
+            freq_list = itertools.combinations(self.get_freq_values(), number_of_xmitters)
         return freq_list
 
     def create_freq_test_list_from_another_list(self, another_list, number_of_xmitters=2):
@@ -254,22 +260,6 @@ class Frequency(object):
         return str(self.freq)
 
 
-class IMD(object):
-    """
-    used to hold the type of IMD and it's freq value
-    """
-    def __init__(self, freq, imd_type):
-        self.imd_type = imd_type
-        self.freq = freq
-
-    @classmethod
-    def build_set_of_imds(cls, flist, order):
-        """
-        creates a set of IMDs given the list
-        """
-        return [cls(f, order) for f in flist]
-
-
 class IntermodCalculator(object):
     """
     used for calculating IMD products for wireless microphone frequency selection
@@ -283,60 +273,47 @@ class IntermodCalculator(object):
         self.triple_beats = triple_beats
         self.coordination = coordination # reserved for later use
 
-    def calculate_imd_between_one_set_of_freqs(self, freqs1, explicit_list=None):
+    def calculate_imd_between_one_set_of_freqs(self, test_freqs):
         """
-        accepts a FrequencyList object and returns a two lists of IMD products
+        accepts a list of two or three frequency combinations and returns a two lists of IMD products
         """
         imd_thirds = set()
         imd_fifths = set()
         imd_triples = set()
-        if not explicit_list:
-            freq_pairs = freqs1.create_freq_test_list_from_itself()
-        else:
-            freq_pairs = explicit_list
-        for freq_pair in freq_pairs:
-            thirds, fifths = self.calculate_imds(freq_pair[0], freq_pair[1])
-            imd_thirds.update(thirds)
-            imd_fifths.update(fifths)
-        # v9, triple beats needs it's own call for single freq test
-        if self.triple_beats:  
-            # don't waste time checking for each combo if we don't need to. There's a safety measure of checking in the calculation too
-            freq_thirds = freqs1.create_freq_test_list_from_itself(3)
-            for freq_combo in freq_thirds:
-                f1 = freq_combo[0]
-                f2 = freq_combo[1]
-                f3 = freq_combo[2]
-                triples = self.calculate_triple_beats(f1, f2, f3)
-                imd_triples.update(triples)
+        for freq_set in test_freqs:
+            f1 = freq_set[0]
+            f2 = freq_set[1]
+            if self.triple_beats:
+                f3 = freq_set[2]
+                _imd_thirds, _imd_fifths, _imd_triples = self.calculate_three_transmitter_imds(f1,f2,f3)
+                imd_triples.update(_imd_triples)
+            else:
+                _imd_thirds, _imd_fifths, _imd_triples = self.calculate_two_transmitter_imds(f1, f2)
+            imd_thirds.update(_imd_thirds)
+            imd_fifths.update(_imd_fifths)
         return imd_thirds, imd_fifths, imd_triples
     
 
     def calculate_imd_between_two_sets(self, freqs1, freqs2):
         """
         freqs1 and freqs2 are FrequencyList objects.  
-        rebuild to the spec in the above method
+        this should be used to check existing system with new potentials
         """
         return
 
-    def calculate_imds(self, f1, f2):
+    def calculate_three_transmitter_imds(self, f1, f2, f3):
         """
-        consolidates third and fifth calculation into one function
+        returns sets of calculated freqs
         """
-        thirds = self.calculate_third_order(f1, f2)
-        fifths = self.calculate_fifth_order(f1, f2)
-        return thirds, fifths
-
-    def calculate_triple_beats(self, f1, f2, f3):
-        """
-        F1 + F2 – F3
-        F1 + F3 – F2
-        F2 + F3 – F1
-        """
-        bad_freqs = set()
+        imd_thirds = set()
+        imd_fifths = set()
+        imd_triples = set()
         if self.triple_beats:
             a = f1 + f2 - f3
             b = f1 + f3 - f2
             c = f2 + f3 - f1
+            imd_triples.update([a,b,c])
+        if self.thirds:
             # third order
             e = (2*f1) - f2
             f = (2*f2) - f1
@@ -344,6 +321,8 @@ class IntermodCalculator(object):
             h = (2*f3) - f1
             i = (2*f2) - f3
             j = (2*f3) - f2 
+            imd_thirds.update([e,f,g,h,i,j])
+        if self.fifths:
             # fifth order
             k = (3*f1) - (2*f2)
             l = (3*f2) - (2*f1)
@@ -351,33 +330,23 @@ class IntermodCalculator(object):
             n = (3*f3) - (2*f1)
             o = (3*f2) - (2*f3)
             p = (3*f3) - (2*f2)
-            bad_freqs = set([a,b,c,e,f,g,h,i,j,k,l,m,n,o,p])
-        return bad_freqs
+            imd_fifths.update([k,l,m,n,o,p])
+        return imd_thirds, imd_fifths, imd_triples
 
-    def calculate_third_order(self, f1, f2):
+    def calculate_two_transmitter_imds(self, f1, f2):
         """
         simply calculates the third order products
         """
-        bad_freqs = set()
+        imd_thirds = set()
+        imd_fifths = set()
+        imd_triples = set() # never gets filled, just return it for consistency
         if self.thirds:
-            #a = round((3*f1),3)
-            #b = round((3*f2),3)
-            #c = round(((2*f1)+f2),3)
+            #thirds
             d = (2*f1)-f2
-            #e = round(((2*f2)+f1),3)
             f = (2*f2)-f1
-            bad_freqs = set([d,f])
-        return bad_freqs
-
-    def calculate_fifth_order(self, f1, f2):
-        """
-        
-        """
-        bad_freqs = set()
-        if self.fifths:
-            #a = round(((3*f1)+(2*f2)),3)
+            imd_thirds.update([d,f])
+            #fifths
             b = (3*f1)-(2*f2)
-            #c = round(((3*f2)+(2*f1)),3)
             d = (3*f2)-(2*f1)
-            bad_freqs = set([b,d])
-        return bad_freqs
+            imd_fifths.update([b,d])
+        return imd_thirds, imd_fifths, imd_triples
