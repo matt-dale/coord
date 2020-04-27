@@ -1,24 +1,32 @@
 import collections
 import itertools
 import random
-
+import numpy as np
 
 """
+ #from IPython import embed; embed()
+
 for profiling, keep the same set of variables, start=470, stop = 500, and don't calculate triple_beats
 v4 found instantiating IMD as an object for all the 5million IMD products is a time waster.
 v5, remove that class creation and use three seperate loops saved tons of time
 v6, adding in the check on self.coordinated freqs spacing against the IMD products, notably increase in time. 
 v7, removing round from all locations and changing abs to local in the function - very little change
 
-try using set.intersection
+added Numpy arrays in V11, no change in speed, but wasn't able to lose all for loops.
+V12 increased speed by adding more math to the np arrays in the test_one_freq method
+reduced calc time to 9 seconds for full IMD checks and 2.78 secs for 3rd/5th imd checks
 
+V13 adding in Equipment models to check spacings against
+
+V14 attempting to create a faster calculation method in the Calculate function
+moved to the calculate_imd_between_one_set_of_freqs_numpy method.  Needs profiling, becuase it is slower than loops
 """
 
 class Coordination(object):
     """
     stores the existing state of the coordination
     """
-    def __init__(self, start_freq=None, end_freq=None, thirds=True, fifths=True, triples=True, *args, **kwargs):
+    def __init__(self, start_freq=None, end_freq=None, thirds=True, fifths=True, triples=True, freqs_to_avoid=[], *args, **kwargs):
         self.coordinated_freqs = FrequencyList([])
         self.uncoordinated_freqs = FrequencyList([])
         self.imd_thirds = []
@@ -44,7 +52,10 @@ class Coordination(object):
         self.avoid_imd_fifths_by = 0.089
         self.avoid_imd_triples_by = 0.049
         self.default_bandwidth = 0.299
+        self.freqs_to_avoid = freqs_to_avoid # this is a list of frequencies that should be avoided by x spacing.  
+        # Should we care about what they are (DTV vs. IEM vs. mic)?  They should still be included in the IMD tests
         self.all_potential_freqs = []
+        self.current_model = None
         self.create_potential_freqs()
 
     def create_file_for_IAS_import(self):
@@ -52,6 +63,32 @@ class Coordination(object):
             h = ','.join([str(x) for x in self.coordinated_freqs.get_freq_values()])
             outFile.write(h+'\r\n')
 
+    def accept_equipment_model(self, equipment_model):
+        """
+        unpacks the model's attrs onto self
+        """
+        if not equipment_model:
+            model = EquipmentModel() # use defaults
+        else:
+            model = equipment_model
+
+        # set these params based on the model
+        self.default_bandwidth = model.bandwidth
+        self.thirds = model.imd_thirds
+        self.fifths = model.imd_fifths
+        self.triple_beats = model.imd_triple_beats
+        self.start_freq = model.start_freq
+        self.end_freq = model.end_freq
+
+        # now recreate imd calc since things have changed
+        self.imd_calc = IntermodCalculator(start_freq=self.start_freq, 
+                                    end_freq=self.end_freq, thirds=self.thirds, 
+                                    fifths=self.fifths, triple_beats=self.triple_beats, 
+                                    coordination=self)
+
+        # also set current model for everyone else
+        self.current_model = model
+        return
 
     def create_potential_freqs(self):
         """
@@ -60,8 +97,11 @@ class Coordination(object):
         """
         self.all_potential_freqs = []
         loop_freq = self.start_freq
+        avoidance_freqs =  self.coordinated_freqs.get_freq_values() 
+        avoidance_freqs.extend(self.freqs_to_avoid)
         while loop_freq < self.end_freq:
-            self.all_potential_freqs.append(loop_freq)
+            if loop_freq not in avoidance_freqs:
+                self.all_potential_freqs.append(loop_freq)
             loop_freq += 0.025
         return
 
@@ -86,11 +126,6 @@ class Coordination(object):
         results = True
         coordinated_freqs = self.coordinated_freqs.get_freq_values()
 
-        # transmitter to transmitter spacing check
-        for cofreq in coordinated_freqs: # test the freq spacing between all other system freqs
-            if abs(test_freq-cofreq) < self.default_bandwidth:
-                results = False
-                return results
         # search for direct hits first to avoid calculating unneccessary imds
         if test_freq in self.imd_thirds:
             return False
@@ -99,12 +134,20 @@ class Coordination(object):
         if test_freq in self.imd_triples:
             return False
 
+        # transmitter to transmitter spacing check
+        for cofreq in coordinated_freqs: # test the freq spacing between all other system freqs
+            if abs(test_freq-cofreq) < self.default_bandwidth:
+                results = False
+                return results
+
+
         test_frequency_list = FrequencyList(coordinated_freqs, added_freq=test_freq)
         xmit_qty = 2
         if self.triple_beats:
             xmit_qty = 3
-        test_list = test_frequency_list.create_freq_test_list_from_itself(xmit_qty)
+        test_list = test_frequency_list.create_freq_test_list_from_itself(number_of_xmitters=xmit_qty)
         imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs(test_list)
+        #imd_thirds, imd_fifths, imd_triples = self.imd_calc.calculate_imd_between_one_set_of_freqs_numpy(test_list)
 
 
         if test_freq in imd_thirds:
@@ -119,45 +162,38 @@ class Coordination(object):
             combined_thirds_list = list(imd_thirds)+self.imd_thirds
             combined_fifths_list = list(imd_fifths)+self.imd_fifths
             combined_triples_list = list(imd_triples)+self.imd_triples
+            list_comparison = [len(combined_thirds_list), len(combined_fifths_list), len(combined_triples_list)]
+            array_length = max(list_comparison)
 
-            all_imds = set(combined_fifths_list+combined_thirds_list+combined_triples_list)
-            
-            """
-            SOOO long of a wait here 
-            This imd list could be millions of freqs
-            """
-            for imd in combined_thirds_list:
-                # test for third
-                difference = abs(imd-test_freq)
-                if difference <= self.avoid_imd_thirds_by:
+            # lists need to be the same size
+            if list_comparison[0] < array_length: # thirds
+                combined_thirds_list.extend([0 for x in range(array_length-list_comparison[0])])
+            if list_comparison[1] < array_length:
+                combined_fifths_list.extend([0 for x in range(array_length-list_comparison[1])])
+            if list_comparison[2] < array_length:
+                combined_triples_list.extend([0 for x in range(array_length-list_comparison[2])])
+            np_imds = np.array([combined_thirds_list, combined_fifths_list, combined_triples_list])
+            differences = np_imds - test_freq
+            results3 = abs(differences[0]) <= self.avoid_imd_thirds_by
+            results5 = abs(differences[1]) <= self.avoid_imd_fifths_by
+            results_triple = abs(differences[2]) <= self.avoid_imd_triples_by
+            if results3.any() or results5.any() or results_triple.any():
+                self.uncoordinated_freqs.append_(test_freq)
+                return False
+
+                
+            for f in coordinated_freqs:
+                f_difference = abs(np_imds[0]-f)
+                if (f_difference <= self.avoid_imd_thirds_by).any():
                     self.uncoordinated_freqs.append_(test_freq)
                     return False
-                for f in coordinated_freqs:
-                    f_difference = abs(imd-f)
-                    if f_difference <= self.avoid_imd_thirds_by:
-                        self.uncoordinated_freqs.append_(test_freq)
-                        return False
-
-            for imd in combined_fifths_list:
-                difference = abs(imd-test_freq)
-                if difference <= self.avoid_imd_fifths_by:
+                f_difference = abs(np_imds[1]-f)
+                if (f_difference <= self.avoid_imd_thirds_by).any():
                     self.uncoordinated_freqs.append_(test_freq)
                     return False
-                for f in coordinated_freqs:
-                    f_difference = abs(imd-f)
-                    if f_difference <= self.avoid_imd_fifths_by:
-                        self.uncoordinated_freqs.append_(test_freq)
-                        return False
-
-            for imd in combined_triples_list:
-                # test for triple
-                difference = abs(imd-test_freq)
-                if difference <= self.avoid_imd_triples_by:
-                    self.uncoordinated_freqs.append_(test_freq)
-                    return False
-                for f in coordinated_freqs:
-                    f_difference = abs(imd-f)
-                    if f_difference <= self.avoid_imd_triples_by:
+                if self.triple_beats:
+                    f_difference = abs(np_imds[2]-f)
+                    if (f_difference <= self.avoid_imd_thirds_by).any():
                         self.uncoordinated_freqs.append_(test_freq)
                         return False
 
@@ -166,24 +202,37 @@ class Coordination(object):
             self.imd_thirds.extend(imd_thirds)
             self.imd_fifths.extend(imd_fifths)
             self.imd_triples.extend(imd_triples)
-            self.coordinated_freqs.append_(test_freq)
+            self.coordinated_freqs.append_(test_freq, model=self.current_model) # needs to include model, V13
         else:
-            self.uncoordinated_freqs.append_(test_freq)
+            self.uncoordinated_freqs.append_(test_freq, model=self.current_model)
 
         return results
 
-    def run_a_test(self, start_freq=None, step_size=None):
+    def calculate(self, equipment_model=None, start_freq=None, end_freq=None, test_freqs=None):
         """
         run a test coordination:
         1 - get a random freq from the possible freqs
         2 - add freq to a temporary system and calculate IMD
         3 - evaluate whether to keep the freq or try another one happens in the method above
         """
-        self.create_potential_freqs()
+        self.accept_equipment_model(equipment_model) # changes all the default settings to those supplied by the model
+        # allow per test overriding of the model start and end freqs
+        if start_freq:
+            self.start_freq = start_freq
+        if end_freq:
+            self.end_freq = end_freq
+        # potential issue here if there are test_freqs outside the band of the current model. what is expected?
+        if test_freqs:
+            self.all_potential_freqs = test_freqs
+        else:
+            self.create_potential_freqs()
         while len(self.all_potential_freqs) > 0:
             freq = self.get_a_freq()
             self.test_one_freq(freq)
         return
+
+
+
 
 
 class FrequencyList(object):
@@ -203,8 +252,8 @@ class FrequencyList(object):
     def length(self):
         return len(self.freq_list)
 
-    def append_(self, freq):
-        self.freq_list.append(Frequency(freq))
+    def append_(self, freq, model=None):
+        self.freq_list.append(Frequency(freq, model=model))
 
     def extend(self, freq_list):
         if type(freq_list) == FrequencyList:
@@ -228,6 +277,7 @@ class FrequencyList(object):
                 freq_list = [(self.added_freq, f[0], f[1]) for f in two_xmit_list]
         else:
             freq_list = itertools.combinations(self.get_freq_values(), number_of_xmitters)
+       
         return freq_list
 
     def create_freq_test_list_from_another_list(self, another_list, number_of_xmitters=2):
@@ -253,9 +303,10 @@ class Frequency(object):
     future features will need this
     """
 
-    def __init__(self, value, *args, **kwargs):
+    def __init__(self, value, model=None, *args, **kwargs):
         self.freq = value
         self.coordinated = False
+        self.model = model
 
     def __str__(self):
         return str(self.freq)
@@ -276,6 +327,79 @@ class IntermodCalculator(object):
         self.fifths = fifths
         self.triple_beats = triple_beats
         self.coordination = coordination # reserved for later use
+
+    def calculate_imd_between_one_set_of_freqs_numpy(self, test_freqs):
+        """
+        accepts a list of two or three frequency combinations and returns a two lists of IMD products
+        """
+        imd_thirds = set()
+        imd_fifths = set()
+        imd_triples = set()
+        if self.triple_beats:
+            # we need 3 freqs in the set to calculate
+            if len(test_freqs) < 3:
+                return imd_thirds, imd_fifths, imd_triples
+        else:
+            if len(test_freqs) < 2:
+                return imd_thirds, imd_fifths, imd_triples
+        # try to eliminate this forloop with numpy
+        freq_array = np.asarray(test_freqs).transpose() 
+        if len(test_freqs[0]) == 3:
+            # triple beats
+            """
+            a = f1 + f2 - f3
+            b = f1 + f3 - f2
+            c = f2 + f3 - f1
+            """
+            if self.triple_beats:
+                a = freq_array[0] + freq_array[1] - freq_array[2]
+                b = freq_array[0] + freq_array[2] - freq_array[1]
+                c = freq_array[1] + freq_array[2] - freq_array[0]
+                imd_triples.update(set(a))
+                imd_triples.update(set(b))
+                imd_triples.update(set(c))
+            if self.thirds:
+                e = (2*freq_array[0]) - freq_array[1]
+                f = (2*freq_array[1]) - freq_array[0]
+                g = (2*freq_array[0]) - freq_array[2]
+                h = (2*freq_array[2]) - freq_array[0]
+                i = (2*freq_array[1]) - freq_array[2]
+                j = (2*freq_array[2]) - freq_array[1]
+                imd_thirds.update(set(e))
+                imd_thirds.update(set(f))
+                imd_thirds.update(set(g))
+                imd_thirds.update(set(h))
+                imd_thirds.update(set(i))
+                imd_thirds.update(set(j))
+            if self.fifths:
+                # fifth order
+                k = (3*freq_array[0]) - (2*freq_array[1])
+                l = (3*freq_array[1]) - (2*freq_array[0])
+                m = (3*freq_array[0]) - (2*freq_array[2])
+                n = (3*freq_array[2]) - (2*freq_array[0])
+                o = (3*freq_array[1]) - (2*freq_array[2])
+                p = (3*freq_array[2]) - (2*freq_array[1])
+                imd_fifths.update(set(k))
+                imd_fifths.update(set(l))
+                imd_fifths.update(set(m))
+                imd_fifths.update(set(n))
+                imd_fifths.update(set(o))
+                imd_fifths.update(set(p))
+        elif len(test_freqs[0]) == 2:
+            if self.thirds:
+                # just 3rds and 5ths
+                q = (2*freq_array[0])-freq_array[1]
+                r = (2*freq_array[1])-freq_array[0]
+                imd_thirds.update(set(q))
+                imd_thirds.update(set(r))
+            if self.fifths:
+                #fifths
+                s = (3*freq_array[0])-(2*freq_array[1])
+                t = (3*freq_array[1])-(2*freq_array[0])
+                imd_fifths.update(set(s))
+                imd_fifths.update(set(t))
+       
+        return imd_thirds, imd_fifths, imd_triples
 
     def calculate_imd_between_one_set_of_freqs(self, test_freqs):
         """
@@ -354,3 +478,33 @@ class IntermodCalculator(object):
             d = (3*f2)-(2*f1)
             imd_fifths.update([b,d])
         return imd_thirds, imd_fifths, imd_triples
+
+
+class EquipmentModel(object):
+    """
+    holds default values for imd calculator
+    """
+    def __init__(self, 
+                manufacturer='Generic', 
+                model='Generic',
+                range_name='Generic',
+                start_freq=470,
+                end_freq=608,
+                no_of_presets=0,
+                vhf_or_uhf='UHF',
+                bandwidth=0.299,
+                imd_thirds=True,
+                imd_fifths=True,
+                imd_triple_beats=True,
+                *args, **kwargs):
+        self.manufacturer = manufacturer
+        self.model = model
+        self.range_name	= range_name
+        self.start_freq	= start_freq
+        self.end_freq = end_freq
+        self.no_of_presets = no_of_presets
+        self.vhf_or_uhf = vhf_or_uhf
+        self.bandwidth = bandwidth
+        self.imd_thirds = imd_thirds
+        self.imd_triple_beats = imd_triple_beats
+        self.imd_fifths = imd_fifths

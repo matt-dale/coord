@@ -1,0 +1,46 @@
+# v14 with Numpy calculation in the calculate_imd_between_one_set_of_freqs_numpy method
+
+In [12]: %prun coord.calculate(equipment_model=model)
+         605025 function calls in 4.193 seconds
+
+   Ordered by: internal time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     6846    1.677    0.000    1.677    0.000 {built-in method numpy.array}
+     5521    1.493    0.000    3.968    0.001 intermod_v14.py:121(test_one_freq)
+     3422    0.293    0.000    0.293    0.000 intermod_v14.py:175(<listcomp>)
+     3424    0.178    0.000    0.267    0.000 intermod_v14.py:332(calculate_imd_between_one_set_of_freqs_numpy)
+        1    0.110    0.110    4.193    4.193 intermod_v14.py:212(calculate)
+     5521    0.086    0.000    0.086    0.000 {method 'remove' of 'list' objects}
+     3424    0.058    0.000    0.105    0.000 intermod_v14.py:244(<listcomp>)
+   170693    0.050    0.000    0.050    0.000 intermod_v14.py:307(__init__)
+   213481    0.050    0.000    0.050    0.000 {built-in method builtins.abs}
+    18647    0.042    0.000    0.042    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+     8946    0.033    0.000    0.033    0.000 intermod_v14.py:267(<listcomp>)
+    13688    0.021    0.000    0.021    0.000 {method 'update' of 'set' objects}
+     3424    0.015    0.000    0.015    0.000 intermod_v14.py:275(<listcomp>)
+     4203    0.015    0.000    0.015    0.000 {method 'extend' of 'list' objects}
+    18647    0.009    0.000    0.056    0.000 {method 'any' of 'numpy.ndarray' objects}
+     5521    0.008    0.000    0.112    0.000 intermod_v14.py:109(get_a_freq)
+     5521    0.007    0.000    0.011    0.000 random.py:224(_randbelow)
+     8946    0.006    0.000    0.039    0.000 intermod_v14.py:266(get_freq_values)
+     3424    0.006    0.000    0.009    0.000 intermod_v14.py:256(append_)
+    18647    0.006    0.000    0.048    0.000 _methods.py:44(_any)
+     5521    0.005    0.000    0.017    0.000 random.py:256(choice)
+     3424    0.005    0.000    0.033    0.000 intermod_v14.py:269(create_freq_test_list_from_itself)
+    37104    0.004    0.000    0.004    0.000 {built-in method builtins.len}
+     3424    0.003    0.000    0.108    0.000 intermod_v14.py:243(__init__)
+     8247    0.003    0.000    0.003    0.000 {method 'getrandbits' of '_random.Random' objects}
+     3424    0.002    0.000    0.002    0.000 {built-in method builtins.max}
+        1    0.002    0.002    0.002    0.002 intermod_v14.py:94(create_potential_freqs)
+     3422    0.002    0.000    0.065    0.000 _asarray.py:16(asarray)
+     3422    0.001    0.000    0.001    0.000 {method 'transpose' of 'numpy.ndarray' objects}
+     8945    0.001    0.000    0.001    0.000 {method 'append' of 'list' objects}
+     5521    0.001    0.000    0.001    0.000 {method 'bit_length' of 'int' objects}
+      445    0.000    0.000    0.000    0.000 intermod_v14.py:171(<listcomp>)
+      173    0.000    0.000    0.000    0.000 intermod_v14.py:173(<listcomp>)
+        1    0.000    0.000    4.193    4.193 {built-in method builtins.exec}
+        1    0.000    0.000    0.000    0.000 intermod_v14.py:67(accept_equipment_model)
+        1    0.000    0.000    4.193    4.193 <string>:1(<module>)
+        1    0.000    0.000    0.000    0.000 intermod_v14.py:324(__init__)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}

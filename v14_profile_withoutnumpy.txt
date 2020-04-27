@@ -1,0 +1,96 @@
+In [5]: %prun coord.calculate(equipment_model=model)
+         1416247 function calls in 3.016 seconds
+
+   Ordered by: internal time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     3330    1.278    0.000    1.278    0.000 {built-in method numpy.array}
+     5521    0.480    0.000    2.837    0.001 intermod_v14.py:120(test_one_freq)
+     3329    0.313    0.000    0.313    0.000 intermod_v14.py:174(<listcomp>)
+   170449    0.201    0.000    0.290    0.000 intermod_v14.py:464(calculate_two_transmitter_imds)
+   681796    0.157    0.000    0.157    0.000 {method 'update' of 'set' objects}
+     3330    0.126    0.000    0.484    0.000 intermod_v14.py:404(calculate_imd_between_one_set_of_freqs)
+     5521    0.082    0.000    0.082    0.000 {method 'remove' of 'list' objects}
+        1    0.070    0.070    3.016    3.016 intermod_v14.py:211(calculate)
+     3330    0.055    0.000    0.103    0.000 intermod_v14.py:243(<listcomp>)
+   173779    0.050    0.000    0.050    0.000 intermod_v14.py:306(__init__)
+   213699    0.045    0.000    0.045    0.000 {built-in method builtins.abs}
+    14298    0.033    0.000    0.033    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+     8852    0.033    0.000    0.033    0.000 intermod_v14.py:266(<listcomp>)
+     6386    0.018    0.000    0.018    0.000 {method 'extend' of 'list' objects}
+     3330    0.015    0.000    0.015    0.000 intermod_v14.py:274(<listcomp>)
+     5521    0.008    0.000    0.106    0.000 intermod_v14.py:108(get_a_freq)
+     5521    0.007    0.000    0.010    0.000 random.py:224(_randbelow)
+    14298    0.007    0.000    0.044    0.000 {method 'any' of 'numpy.ndarray' objects}
+     8852    0.006    0.000    0.038    0.000 intermod_v14.py:265(get_freq_values)
+     3330    0.005    0.000    0.008    0.000 intermod_v14.py:255(append_)
+     5521    0.005    0.000    0.016    0.000 random.py:256(choice)
+    14298    0.004    0.000    0.038    0.000 _methods.py:44(_any)
+     3330    0.004    0.000    0.032    0.000 intermod_v14.py:268(create_freq_test_list_from_itself)
+    26554    0.003    0.000    0.003    0.000 {built-in method builtins.len}
+     3330    0.003    0.000    0.105    0.000 intermod_v14.py:242(__init__)
+     8143    0.002    0.000    0.002    0.000 {method 'getrandbits' of '_random.Random' objects}
+     3330    0.002    0.000    0.002    0.000 {built-in method builtins.max}
+        1    0.002    0.002    0.002    0.002 intermod_v14.py:93(create_potential_freqs)
+     8851    0.001    0.000    0.001    0.000 {method 'append' of 'list' objects}
+     2848    0.001    0.000    0.001    0.000 intermod_v14.py:172(<listcomp>)
+     5521    0.001    0.000    0.001    0.000 {method 'bit_length' of 'int' objects}
+        1    0.000    0.000    3.016    3.016 {built-in method builtins.exec}
+       40    0.000    0.000    0.000    0.000 intermod_v14.py:170(<listcomp>)
+        1    0.000    0.000    0.000    0.000 intermod_v14.py:66(accept_equipment_model)
+        1    0.000    0.000    0.000    0.000 _weakrefset.py:38(_remove)
+        1    0.000    0.000    3.016    3.016 <string>:1(<module>)
+        1    0.000    0.000    0.000    0.000 intermod_v14.py:323(__init__)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+        1    0.000    0.000    0.000    0.000 {method 'discard' of 'set' objects}
+
+
+
+# calulating triple_beats
+
+
+In [4]: %prun coord.calculate(equipment_model=model)
+         6337917 function calls in 9.874 seconds
+
+   Ordered by: internal time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     3415    2.676    0.001    2.676    0.001 {built-in method numpy.array}
+  5129616    2.153    0.000    2.153    0.000 {method 'update' of 'set' objects}
+   854936    2.012    0.000    3.358    0.000 intermod_v14.py:432(calculate_three_transmitter_imds)
+     5521    1.031    0.000    9.566    0.002 intermod_v14.py:120(test_one_freq)
+     3486    0.993    0.000    5.158    0.001 intermod_v14.py:404(calculate_imd_between_one_set_of_freqs)
+        1    0.197    0.197    9.874    9.874 intermod_v14.py:211(calculate)
+     3408    0.177    0.000    0.177    0.000 intermod_v14.py:170(<listcomp>)
+     3408    0.171    0.000    0.171    0.000 intermod_v14.py:172(<listcomp>)
+     3486    0.136    0.000    0.136    0.000 intermod_v14.py:277(<listcomp>)
+     5521    0.081    0.000    0.081    0.000 {method 'remove' of 'list' objects}
+    97659    0.048    0.000    0.048    0.000 {built-in method builtins.abs}
+    12330    0.034    0.000    0.034    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+     3486    0.028    0.000    0.050    0.000 intermod_v14.py:243(<listcomp>)
+     6891    0.026    0.000    0.026    0.000 {method 'extend' of 'list' objects}
+    82224    0.025    0.000    0.025    0.000 intermod_v14.py:306(__init__)
+     9008    0.017    0.000    0.017    0.000 intermod_v14.py:266(<listcomp>)
+     3486    0.009    0.000    0.152    0.000 intermod_v14.py:268(create_freq_test_list_from_itself)
+     5521    0.008    0.000    0.108    0.000 intermod_v14.py:108(get_a_freq)
+     5521    0.007    0.000    0.011    0.000 random.py:224(_randbelow)
+    12330    0.007    0.000    0.044    0.000 {method 'any' of 'numpy.ndarray' objects}
+     3415    0.007    0.000    0.010    0.000 intermod_v14.py:255(append_)
+     9008    0.006    0.000    0.023    0.000 intermod_v14.py:265(get_freq_values)
+     5521    0.006    0.000    0.018    0.000 random.py:256(choice)
+    12330    0.004    0.000    0.038    0.000 _methods.py:44(_any)
+    26809    0.003    0.000    0.003    0.000 {built-in method builtins.len}
+     8209    0.003    0.000    0.003    0.000 {method 'getrandbits' of '_random.Random' objects}
+     3486    0.003    0.000    0.053    0.000 intermod_v14.py:242(__init__)
+     3415    0.002    0.000    0.002    0.000 {built-in method builtins.max}
+        1    0.001    0.001    0.002    0.002 intermod_v14.py:93(create_potential_freqs)
+     8936    0.001    0.000    0.001    0.000 {method 'append' of 'list' objects}
+     5521    0.001    0.000    0.001    0.000 {method 'bit_length' of 'int' objects}
+        1    0.000    0.000    9.874    9.874 {built-in method builtins.exec}
+        1    0.000    0.000    0.000    0.000 _weakrefset.py:38(_remove)
+        1    0.000    0.000    0.000    0.000 intermod_v14.py:66(accept_equipment_model)
+        5    0.000    0.000    0.000    0.000 intermod_v14.py:174(<listcomp>)
+        1    0.000    0.000    9.874    9.874 <string>:1(<module>)
+        1    0.000    0.000    0.000    0.000 intermod_v14.py:323(__init__)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+        1    0.000    0.000    0.000    0.000 {method 'discard' of 'set' objects}
